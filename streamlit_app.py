@@ -29,8 +29,8 @@ def authenticate():
             if st.button("ログイン", use_container_width=True):
                 # ユーザー情報
                 users = {
-                    "admin": "5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8",  # "password"
-                    "analyst": "ef797c8118f02dfb649607dd5d3f8c7623048c9c063d532cc95c5ed7a898a64f"  # "hello123"
+                    "admin": st.secrets["ADMIN_PASS_HASH"],
+                    "analyst": st.secrets["ANALYST_PASS_HASH"]
                 }
                 
                 hashed = hashlib.sha256(password.encode()).hexdigest()
