@@ -57,31 +57,130 @@ def sales_analysis():
     """売上分析ツール"""
     st.header("📈 売上分析")
     
-    # サンプルデータ生成
-    np.random.seed(42)
-    dates = pd.date_range('2024-01-01', periods=365)
-    sales_data = pd.DataFrame({
-        '日付': dates,
-        '売上': np.random.normal(100000, 20000, 365),
-        '商品カテゴリ': np.random.choice(['A', 'B', 'C'], 365),
-        '地域': np.random.choice(['東京', '大阪', '名古屋'], 365)
-    })
+    # CSV取り込み機能
+    st.subheader("📂 データの選択")
+    data_source = st.radio(
+        "データソースを選択",
+        ["サンプルデータを使用", "CSVファイルをアップロード"]
+    )
+    
+    if data_source == "CSVファイルをアップロード":
+        uploaded_file = st.file_uploader(
+            "売上データのCSVファイルをアップロード", 
+            type="csv",
+            help="列名例: 日付, 売上, 商品カテゴリ, 地域"
+        )
+        
+        if uploaded_file is not None:
+            try:
+                # CSVを読み込み
+                sales_data = pd.read_csv(uploaded_file)
+                
+                # データの形式確認
+                st.success(f"✅ データを読み込みました！({len(sales_data)}行)")
+                
+                # 列名の表示
+                st.write("**列名:**", list(sales_data.columns))
+                
+                # データプレビュー
+                with st.expander("データプレビュー"):
+                    st.dataframe(sales_data.head())
+                
+                # 列名のマッピング
+                st.subheader("📋 列名の設定")
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    date_col = st.selectbox("日付列", sales_data.columns)
+                    amount_col = st.selectbox("売上金額列", sales_data.columns)
+                
+                with col2:
+                    category_col = st.selectbox("カテゴリ列", sales_data.columns, index=min(2, len(sales_data.columns)-1))
+                    region_col = st.selectbox("地域列", sales_data.columns, index=min(3, len(sales_data.columns)-1))
+                
+                # データ変換と分析
+                if st.button("📊 分析開始"):
+                    try:
+                        # 日付変換
+                        sales_data[date_col] = pd.to_datetime(sales_data[date_col])
+                        sales_data[amount_col] = pd.to_numeric(sales_data[amount_col], errors='coerce')
+                        
+                        # 分析実行
+                        analyze_sales_data(sales_data, date_col, amount_col, category_col, region_col)
+                        
+                    except Exception as e:
+                        st.error(f"データ処理エラー: {str(e)}")
+                        st.info("日付形式や数値形式を確認してください")
+                        
+            except Exception as e:
+                st.error(f"ファイル読み込みエラー: {str(e)}")
+                st.info("CSVファイルの形式を確認してください")
+        else:
+            st.info("👆 CSVファイルをアップロードしてください")
+    
+    else:
+        # サンプルデータを使用（既存のコード）
+        st.info("サンプルデータを使用しています")
+        np.random.seed(42)
+        dates = pd.date_range('2024-01-01', periods=365)
+        sales_data = pd.DataFrame({
+            '日付': dates,
+            '売上': np.random.normal(100000, 20000, 365),
+            '商品カテゴリ': np.random.choice(['A', 'B', 'C'], 365),
+            '地域': np.random.choice(['東京', '大阪', '名古屋'], 365)
+        })
+        analyze_sales_data(sales_data, '日付', '売上', '商品カテゴリ', '地域')
+
+def analyze_sales_data(sales_data, date_col, amount_col, category_col, region_col):
+    """売上データの分析を実行"""
     
     col1, col2 = st.columns(2)
     
     with col1:
         st.subheader("月別売上推移")
-        monthly_sales = sales_data.groupby(sales_data['日付'].dt.month)['売上'].sum()
-        st.line_chart(monthly_sales)
+        try:
+            monthly_sales = sales_data.groupby(sales_data[date_col].dt.month)[amount_col].sum()
+            st.line_chart(monthly_sales)
+        except Exception as e:
+            st.error(f"月別売上グラフエラー: {str(e)}")
     
     with col2:
         st.subheader("カテゴリ別売上")
-        category_sales = sales_data.groupby('商品カテゴリ')['売上'].sum()
-        st.bar_chart(category_sales)
+        try:
+            category_sales = sales_data.groupby(category_col)[amount_col].sum()
+            st.bar_chart(category_sales)
+        except Exception as e:
+            st.error(f"カテゴリ別売上グラフエラー: {str(e)}")
     
-    st.subheader("詳細データ")
+    # 統計情報
+    st.subheader("📊 統計情報")
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("総売上", f"¥{sales_data[amount_col].sum():,.0f}")
+    with col2:
+        st.metric("平均売上", f"¥{sales_data[amount_col].mean():,.0f}")
+    with col3:
+        st.metric("データ件数", f"{len(sales_data):,}件")
+    with col4:
+        try:
+            st.metric("期間", f"{sales_data[date_col].dt.date.min()} - {sales_data[date_col].dt.date.max()}")
+        except:
+            st.metric("期間", "N/A")
+    
+    # 詳細データテーブル
+    st.subheader("📋 詳細データ")
     st.dataframe(sales_data.head(10))
-
+    
+    # ダウンロード機能
+    csv = sales_data.to_csv(index=False)
+    st.download_button(
+        label="📥 分析結果をCSVダウンロード",
+        data=csv,
+        file_name="sales_analysis_result.csv",
+        mime="text/csv"
+    )
+    
 def customer_analysis():
     """顧客分析ツール"""
     st.header("👥 顧客分析")
@@ -154,6 +253,55 @@ def inventory_analysis():
         st.subheader("在庫数トップ10")
         top_stock = inventory_data.nlargest(10, '在庫数')[['商品名', '在庫数']]
         st.dataframe(top_stock)
+
+def analyze_sales_data(sales_data, date_col, amount_col, category_col, region_col):
+    """売上データの分析を実行"""    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("月別売上推移")
+        try:
+            monthly_sales = sales_data.groupby(sales_data[date_col].dt.month)[amount_col].sum()
+            st.line_chart(monthly_sales)
+        except Exception as e:
+            st.error(f"月別売上グラフエラー: {str(e)}")
+    
+    with col2:
+        st.subheader("カテゴリ別売上")
+        try:
+            category_sales = sales_data.groupby(category_col)[amount_col].sum()
+            st.bar_chart(category_sales)
+        except Exception as e:
+            st.error(f"カテゴリ別売上グラフエラー: {str(e)}")
+    
+    # 統計情報
+    st.subheader("📊 統計情報")
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("総売上", f"¥{sales_data[amount_col].sum():,.0f}")
+    with col2:
+        st.metric("平均売上", f"¥{sales_data[amount_col].mean():,.0f}")
+    with col3:
+        st.metric("データ件数", f"{len(sales_data):,}件")
+    with col4:
+        try:
+            st.metric("期間", f"{sales_data[date_col].dt.date.min()} - {sales_data[date_col].dt.date.max()}")
+        except:
+            st.metric("期間", "N/A")
+    
+    # 詳細データテーブル
+    st.subheader("📋 詳細データ")
+    st.dataframe(sales_data.head(10))
+    
+    # ダウンロード機能
+    csv = sales_data.to_csv(index=False)
+    st.download_button(
+        label="📥 分析結果をCSVダウンロード",
+        data=csv,
+        file_name="sales_analysis_result.csv",
+        mime="text/csv"
+    )
 
 def main():
     """メインアプリケーション"""
